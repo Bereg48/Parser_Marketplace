@@ -1,212 +1,161 @@
-# import pandas as pd
-# import requests
-# from bs4 import BeautifulSoup
-#
-# # Загрузка кодов товаров из файла
-# with open('codes.txt', 'r') as f:
-#     codes = f.read().splitlines()
-#
-# # Создание пустого DataFrame для хранения данных
-# df = pd.DataFrame(columns=['Код товара', 'Название товара', 'URL страницы с товаром', 'URL первой картинки', 'Цена базовая', 'Цена с учетом скидок без Ozon Карты', 'Цена по Ozon Карте', 'Продавец', 'Количество отзывов', 'Количество видео', 'Количество вопросов', 'Рейтинг товара', 'Все доступные характеристики товара', 'Информация о доставке в Москве', 'Уцененный товар'])
-#
-# # Парсинг каждого товара
-# for code in codes:
-#     url = f'https://www.ozon.ru/product/{code}'
-#     response = requests.get(url)
-#     soup = BeautifulSoup(response.text, 'html.parser')
-#
-#     # Здесь нужно получить все необходимые данные с помощью BeautifulSoup
-#     # Например, для названия товара:
-#     name_element = soup.find('input', {'class': 'x7u tsBody500Medium'})
-#     name = name_element.text if name_element else 'No name'
-#
-#     # Заполнение DataFrame
-#     df = pd.concat([df, pd.DataFrame({'Код товара': [code], 'Название товара': [name]})], ignore_index=True)
-#
-# # Сохранение DataFrame в файл
-# df.to_excel('products.xlsx', index=False)
-
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
+import time as tm
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+import undetected_chromedriver as uc
+
 
 # Загрузка кодов товаров из файла
 with open('codes.txt', 'r') as f:
     codes = f.read().splitlines()
 
 # Создание пустого DataFrame для хранения данных
-df = pd.DataFrame(columns=['Код товара', 'Название товара', 'URL страницы с товаром', 'URL первой картинки', 'Цена базовая', 'Цена с учетом скидок без Ozon Карты', 'Цена по Ozon Карте', 'Продавец', 'Количество отзывов', 'Количество видео', 'Количество вопросов', 'Рейтинг товара', 'Все доступные характеристики товара', 'Информация о доставке в Москве', 'Уцененный товар'])
+df = pd.DataFrame(columns=['Код товара', 'Название товара', 'URL страницы с товаром', 'URL первой картинки', 'Цена базовая', 'Цена с учетом скидок без Ozon Карты', 'Цена по Ozon Карте', 'Продавец', 'Количество отзывов', 'Количество видео', 'Количество вопросов', 'Рейтинг товара', 'Все доступные характеристики товара', 'Информация о доставке в Москве'])
+
+# Инициализация веб-драйвера
+driver = uc.Chrome()
+
+driver.implicitly_wait(10)
 
 # Парсинг каждого товара
 for code in codes:
-    url = f'https://www.ozon.ru/product/{code}'
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-    }
+    try:
+        print(code)
+        #получение ссылки на товар через костыли
+        #ссылка на главную страницу озон
+        url = 'https://www.ozon.ru'
 
-    response = requests.get(url, headers=headers)
-    print(response)
-    soup = BeautifulSoup(response.text, 'html.parser')
+        # Загрузка страницы товара с помощью веб-драйвера
+        driver.get(url)
+        tm.sleep(2)
 
-    # Получение названия товара
-    name_elements = soup.findAll('div', class_='n4i n5i')
-    print(name_elements)
+        find_goods = driver.find_element(By.NAME, 'text')
+        find_goods.clear()
+        find_goods.send_keys(code)
+        tm.sleep(2)
 
-    # Поиск элемента с тегом 'h1' среди найденных элементов
-    name_element = next((element for element in name_elements if element.name == 'h1'), None)
+        find_goods.send_keys(Keys.ENTER)
+        tm.sleep(2)
 
-    # Извлечение текста из найденного элемента или, в случае его отсутствия, присвоение значения 'No name'
-    name = name_element.text if name_element else 'No name'
+        try:
+            find_goods = driver.find_element(By.XPATH, '//*[@id="paginatorContent"]/div/div/div/a')
+        except:
+            continue
+        find_goods.click()
+        tm.sleep(2)
 
-    # Получение URL страницы с товаром
-    page_url = url
+        # Получение HTML-кода страницы
+        page_source = str(driver.page_source)
 
-    # Получение URL первой картинки
-    image_element = soup.find('img')
-    image_url = image_element.get('src') if image_element else ''
+        # Создание объекта BeautifulSoup для парсинга HTML-кода
+        soup = BeautifulSoup(page_source, 'html.parser')
+        # работа с html
+        # Получение названия товара
+        name_element = soup.find('h1')
+        name = name_element.text.strip() if name_element else 'No name'
 
-    # Получение цены базовая
-    base_price_element = soup.find('div', {'class': 'b3d2'})
-    base_price = base_price_element.text.strip() if base_price_element else ''
 
-    # Получение цены со скидкой без Ozon Карты
-    discount_price_element = soup.find('div', {'class': 'v1c8'})
-    discount_price = discount_price_element.text.strip() if discount_price_element else ''
+        # if soup.find('video-player'):
+        #     print('video')
+        #     find_img = driver.find_element(By.XPATH, '//*[@data-index="1"]/div/img')
+        #     find_img.click()
+        #     tm.sleep(1)
+        #     image_element = soup.find('div', {"data-widget": "webGallery"}).findNext('div').findAll('div')[1].findAll('div')[0].findNext('img')
+        #     print(image_element)
+        #     image_url = ''
+        # else:
+        #     # Получение URL первой картинки
+        #     image_element = soup.select(f'img[alt*="{name}"]')
+        #     image_url = image_element[1].get('src') if image_element else ''
 
-    # Получение цены по Ozon Карте
-    ozon_card_price_element = soup.find('div', {'class': 'k6x1'})
-    ozon_card_price = ozon_card_price_element.text.strip() if ozon_card_price_element else ''
+        # Получение информации о доставке в Москве
+        tm.sleep(1)
+        driver.execute_script("window.scrollBy(0, 2200)")
+        tm.sleep(4)
+        try:
+            delivery_info_element = soup.find('h2', string="Информация о доставке").parent
+            delivery_info = delivery_info_element.text.strip() if delivery_info_element else ''
+        except:
+            delivery_info = ''
 
-    # Получение продавца
-    seller_element = soup.find('a', {'class': 'k3r7'})
-    seller = seller_element.text.strip() if seller_element else ''
 
-    # Получение количества отзывов
-    reviews_element = soup.find('a', {'class': 'b1oq'})
-    reviews_count = reviews_element.text.strip() if reviews_element else ''
 
-    # Получение количества видео
-    videos_element = soup.find('a', {'class': 'b2gr'})
-    videos_count = videos_element.text.strip() if videos_element else ''
+        # Получение URL страницы с товаром
+        page_url = url + '/' + code
 
-    # Получение количества вопросов
-    questions_element = soup.find('span', {'class': 'b7e6'})
-    questions_count = questions_element.text.strip() if questions_element else ''
 
-    # Получение рейтинга товара
-    rating_element = soup.find('div', {'class': 'd7g9'})
-    rating = rating_element.text.strip() if rating_element else ''
 
-    # Получение всех доступных характеристик товара
-    characteristics_element = soup.find('ul', {'class': 'd7y9'})
-    characteristics = characteristics_element.text.strip() if characteristics_element else ''
+        # Получение цены со скидкой без Ozon Карты
+        price_element = soup.find('span', string="без Ozon Карты").parent.parent.find('div').findAll('span')
+        discount_price = price_element[0].text.strip() if price_element[0] else ''
 
-    # Получение информации о доставке в Москве
-    delivery_info_element = soup.find('div', {'class': 'd9b9'})
-    delivery_info = delivery_info_element.text.strip() if delivery_info_element else ''
+        # Получение цены базовая
+        base_price = price_element[1].text.strip() if price_element[1] is not None else ''
 
-    # Получение информации об уцененном товаре
-    damaged_element = soup.find('div', {'class': 'd7b1'})
-    damaged_info = damaged_element.text.strip() if damaged_element else ''
+        # Получение цены по Ozon Карте
+        ozon_card_price_element = soup.find('span', string="c Ozon Картой").parent.find('div').find('span')
+        ozon_card_price = ozon_card_price_element.text.strip() if ozon_card_price_element else ''
 
-    # Заполнение DataFrame
-    df = pd.concat([df, pd.DataFrame({'Код товара': [code], 'Название товара': [name], 'URL страницы с товаром': [page_url], 'URL первой картинки': [image_url], 'Цена базовая': [base_price], 'Цена с учетом скидок без Ozon Карты': [discount_price], 'Цена по Ozon Карте': [ozon_card_price], 'Продавец': [seller], 'Количество отзывов': [reviews_count], 'Количество видео': [videos_count], 'Количество вопросов': [questions_count], 'Рейтинг товара': [rating], 'Все доступные характеристики товара': [characteristics], 'Информация о доставке в Москве': [delivery_info], 'Уцененный товар': [damaged_info]})], ignore_index=True)
+        # Получение продавца
+        seller_element = soup.find('div', {"data-widget": "webCurrentSeller"}).select('a[href*="ozon.ru/seller"]')
+        seller = seller_element[-1].get('title').strip() if seller_element else ''
+
+        # Получение количества отзывов, видео, вопросов
+        reviews_element = soup.find('div', {"data-widget":"webReviewProductScore"}).find('a').get('title')
+        reviews_count = reviews_element.strip().split()[0] if reviews_element[0] else ''
+
+        video_element = soup.find('div', {"data-widget": "webVideosCount"}).find('a').get('title')
+        video_count = video_element.strip().split()[0] if reviews_element[1] else ''
+
+        questions_element = soup.find('div', {"data-widget": "webQuestionCount"}).find('a').get('title')
+        questions_count = questions_element.strip().split()[0] if reviews_element[2] else ''
+
+        print(reviews_count, video_count, questions_count)
+
+        # Получение всех доступных характеристик товара
+        characteristics_element = soup.findAll('dd')
+        characteristics = ', '.join([element.text.strip() for element in characteristics_element]) if characteristics_element else ''
+
+        # Получение рейтинга
+        try:
+            rate_element = soup.find("span", string=" рейтинг товаров").parent.findAll('span')[0]
+            print(rate_element)
+            rate_info = rate_element.text.strip() if rate_element else ''
+        except:
+            rate_info = 0
+
+        # Получение информации об уцененном товаре
+        damaged_element = soup.find('div', {'class': 'd7b1'})
+        damaged_info = damaged_element.text.strip() if damaged_element else ''
+
+        # Заполнение DataFrame
+        df = pd.concat([
+            df, pd.DataFrame({
+                'Код товара': [code],
+                'Название товара': [name],
+                'URL страницы с товаром': [page_url],
+                # 'URL первой картинки': [image_url],
+                'Цена базовая': [base_price],
+                'Цена с учетом скидок без Ozon Карты': [discount_price],
+                'Цена по Ozon Карте': [ozon_card_price],
+                'Продавец': [seller],
+                'Количество отзывов': [reviews_count],
+                'Количество видео': video_count,
+                'Количество вопросов': questions_count,
+                'Рейтинг товара': rate_info,
+                'Все доступные характеристики товара': [characteristics],
+                'Информация о доставке в Москве': [delivery_info],
+            })
+        ], ignore_index=True)
+    except:
+        continue
+
+# Закрытие веб-драйвера
+driver.close()
+driver.quit()
+
+print(df.to_string())
 
 # Сохранение DataFrame в файл
 df.to_excel('products.xlsx', index=False)
-
-
-# import pandas as pd
-# import requests
-# from bs4 import BeautifulSoup
-# from selenium import webdriver
-#
-# # Загрузка кодов товаров из файла
-# with open('codes.txt', 'r') as f:
-#     codes = f.read().splitlines()
-#
-# # Создание пустого DataFrame для хранения данных
-# df = pd.DataFrame(columns=['Код товара', 'Название товара', 'URL страницы с товаром', 'URL первой картинки', 'Цена базовая', 'Цена с учетом скидок без Ozon Карты', 'Цена по Ozon Карте', 'Продавец', 'Количество отзывов', 'Количество видео', 'Количество вопросов', 'Рейтинг товара', 'Все доступные характеристики товара', 'Информация о доставке в Москве', 'Уцененный товар'])
-#
-# # Инициализация веб-драйвера
-# driver = webdriver.Chrome()
-#
-# # Парсинг каждого товара
-# for code in codes:
-#     url = f'https://www.ozon.ru/product/{code}'
-#
-#     # Загрузка страницы товара с помощью веб-драйвера
-#     driver.get(url)
-#
-#     # Получение HTML-кода страницы
-#     page_source = driver.page_source
-#
-#     # Создание объекта BeautifulSoup для парсинга HTML-кода
-#     soup = BeautifulSoup(page_source, 'html.parser')
-#
-#     # Получение названия товара
-#     name_element = soup.find(class_='nl4').find('h1')
-#     name = name_element.text.strip() if name_element else 'No name'
-#
-#     # Получение URL страницы с товаром
-#     page_url = url
-#
-#     # Получение URL первой картинки
-#     image_element = soup.find('img')
-#     image_url = image_element.get('src') if image_element else ''
-#
-#     # Получение цены базовая
-#     base_price_element = soup.find('div', {'class': 'b3d2'})
-#     base_price = base_price_element.text.strip() if base_price_element else ''
-#
-#     # Получение цены со скидкой без Ozon Карты
-#     discount_price_element = soup.find('div', {'class': 'v1c8'})
-#     discount_price = discount_price_element.text.strip() if discount_price_element else ''
-#
-#     # Получение цены по Ozon Карте
-#     ozon_card_price_element = soup.find('div', {'class': 'k6x1'})
-#     ozon_card_price = ozon_card_price_element.text.strip() if ozon_card_price_element else ''
-#
-#     # Получение продавца
-#     seller_element = soup.find('a', {'class': 'k3r7'})
-#     seller = seller_element.text.strip() if seller_element else ''
-#
-#     # Получение количества отзывов
-#     reviews_element = soup.find('a', {'class': 'b1oq'})
-#     reviews_count = reviews_element.text.strip() if reviews_element else ''
-#
-#     # Получение всех доступных характеристик товара
-#     characteristics_element = soup.find('ul', {'class': 'd7y9'})
-#     characteristics = characteristics_element.text.strip() if characteristics_element else ''
-#
-#     # Получение информации о доставке в Москве
-#     delivery_info_element = soup.find('div', {'class': 'd9b9'})
-#     delivery_info = delivery_info_element.text.strip() if delivery_info_element else ''
-#
-#     # Получение информации об уцененном товаре
-#     damaged_element = soup.find('div', {'class': 'd7b1'})
-#     damaged_info = damaged_element.text.strip() if damaged_element else ''
-#
-#     # Заполнение DataFrame
-#     df = pd.concat([
-#         df, pd.DataFrame({
-#             'Код товара': [code],
-#             'Название товара': [name],
-#             'URL страницы с товаром': [page_url],
-#             'URL первой картинки': [image_url],
-#             'Цена базовая': [base_price],
-#             'Цена с учетом скидок без Ozon Карты': [discount_price],
-#             'Цена по Ozon Карте': [ozon_card_price],
-#             'Продавец': [seller],
-#             'Количество отзывов': [reviews_count],
-#             'Все доступные характеристики товара': [characteristics],
-#             'Информация о доставке в Москве': [delivery_info],
-#             'Уцененный товар': [damaged_info]
-#         })
-#     ], ignore_index=True)
-#
-# # Закрытие веб-драйвера
-# driver.quit()
-#
-# # Сохранение DataFrame в файл
-# df.to_excel('products.xlsx', index=False)
